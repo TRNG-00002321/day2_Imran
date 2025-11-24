@@ -1,0 +1,10 @@
+.DS_Store
+.vscode/
+*.log
+*.db
+__pycache__/
+*.py[cod]
+
+# Java/Maven
+**/target/
+*.class

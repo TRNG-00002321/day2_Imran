@@ -20,27 +20,6 @@ public class App {
     private static final String DEFAULT_DB = "revature_expense_manager.db";
     private static final String LOG_FILE = "manager_app.log";
 
-    private static void configureLogging() {
-        Logger root = Logger.getLogger("");
-        root.setLevel(Level.INFO);
-        for (var handler : root.getHandlers()) {
-            root.removeHandler(handler);
-        }
-        try {
-            FileHandler fileHandler = new FileHandler(LOG_FILE, true);
-            fileHandler.setFormatter(new SimpleFormatter());
-            fileHandler.setLevel(Level.INFO);
-            root.addHandler(fileHandler);
-        } catch (IOException e) {
-            logger.log(Level.SEVERE, "Failed to initialize file logging", e);
-        }
-
-        ConsoleHandler consoleHandler = new ConsoleHandler();
-        consoleHandler.setFormatter(new SimpleFormatter());
-        consoleHandler.setLevel(Level.WARNING);
-        root.addHandler(consoleHandler);
-    }
-
     public static void main(String[] args) {
         configureLogging();
 
@@ -48,22 +27,25 @@ public class App {
         Database database = new Database(dbPath);
         database.initSchema();
 
+        Menu menu = createMenu(database);
+
+        logger.log(Level.INFO, () -> "Launching Manager App using database at " + dbPath);
+        menu.start();
+        logger.log(Level.INFO, () -> "Manager App shut down");
+    }
+
+    private static Menu createMenu(Database database) {
         UserDao userDao = new UserDao(database);
         ExpenseDao expenseDao = new ExpenseDao(database);
-
         AuthService authService = new AuthService(userDao);
         ExpenseService expenseService = new ExpenseService(expenseDao, userDao);
-        Menu menu = new Menu(authService, expenseService);
-
-        logger.info("Launching Manager App using database at " + database.getDbPath());
-        menu.start();
-        logger.info("Manager App shut down");
+        return new Menu(authService, expenseService);
     }
 
     private static Path resolveDbPath() {
-        String env = System.getenv("EXPENSE_DB_FILE");
-        if (env != null && !env.isBlank()) {
-            return Path.of(env);
+        String envPath = System.getenv("EXPENSE_DB_FILE");
+        if (envPath != null && !envPath.isBlank()) {
+            return Path.of(envPath);
         }
         Path local = Path.of(DEFAULT_DB);
         if (local.toFile().exists()) {
@@ -74,5 +56,27 @@ public class App {
             return parent;
         }
         return local;
+    }
+
+    private static void configureLogging() {
+        Logger rootLogger = Logger.getLogger("");
+        rootLogger.setLevel(Level.INFO);
+        for (var handler : rootLogger.getHandlers()) {
+            rootLogger.removeHandler(handler);
+        }
+
+        ConsoleHandler consoleHandler = new ConsoleHandler();
+        consoleHandler.setLevel(Level.WARNING);
+        consoleHandler.setFormatter(new SimpleFormatter());
+        rootLogger.addHandler(consoleHandler);
+
+        try {
+            FileHandler fileHandler = new FileHandler(LOG_FILE, true);
+            fileHandler.setLevel(Level.INFO);
+            fileHandler.setFormatter(new SimpleFormatter());
+            rootLogger.addHandler(fileHandler);
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, "Unable to start file logging", e);
+        }
     }
 }

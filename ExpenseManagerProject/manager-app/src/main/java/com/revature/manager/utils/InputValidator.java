@@ -5,27 +5,39 @@ import com.revature.manager.exceptions.ValidationException;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 
-public class InputValidator {
+public final class InputValidator {
     private InputValidator() {
+        // Utility class; no instances required.
     }
 
-    public static void requireNonEmpty(String value, String field) {
+    /**
+     * Ensures the provided value is not null or blank.
+     */
+    public static void requireNonEmpty(String value, String fieldName) {
         if (value == null || value.isBlank()) {
-            throw new ValidationException(field + " cannot be empty");
+            throw new ValidationException(fieldName + " cannot be empty");
         }
     }
 
+    /**
+     * Ensures the status matches one of the supported values.
+     */
     public static void requireStatus(String status) {
-        if (!status.matches("pending|approved|denied")) {
+        if (!"pending".equalsIgnoreCase(status)
+            && !"approved".equalsIgnoreCase(status)
+            && !"denied".equalsIgnoreCase(status)) {
             throw new ValidationException("Status must be pending, approved, or denied");
         }
     }
 
-    public static LocalDate parseIsoDate(String value, String field) {
+    /**
+     * Parses a date value and raises a readable exception when the format is wrong.
+     */
+    public static LocalDate parseIsoDate(String value, String fieldName) {
         try {
             return LocalDate.parse(value);
         } catch (DateTimeParseException e) {
-            throw new ValidationException(field + " must be in YYYY-MM-DD format");
+            throw new ValidationException(fieldName + " must be in YYYY-MM-DD format");
         }
     }
 }

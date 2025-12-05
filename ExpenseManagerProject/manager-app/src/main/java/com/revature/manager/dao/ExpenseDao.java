@@ -16,6 +16,7 @@ import java.util.logging.Logger;
 
 public class ExpenseDao {
     private static final Logger logger = Logger.getLogger(ExpenseDao.class.getName());
+
     private final Database database;
 
     public ExpenseDao(Database database) {
@@ -23,101 +24,99 @@ public class ExpenseDao {
     }
 
     public List<Expense> listPending() {
-        String sql = baseExpenseSelect() + " WHERE e.status = 'pending' ORDER BY e.date ASC";
-        return queryExpenses(sql);
+        return runExpenseQuery("WHERE e.status = 'pending' ORDER BY e.date ASC");
     }
 
     public List<Expense> listByUser(String userId) {
-        String sql = baseExpenseSelect() + " WHERE e.user_id = ? ORDER BY e.date DESC";
-        return queryExpenses(sql, userId);
+        return runExpenseQuery("WHERE e.user_id = ? ORDER BY e.date DESC", userId);
     }
 
     public List<Expense> listByStatus(String status) {
-        String sql = baseExpenseSelect() + " WHERE e.status = ? ORDER BY e.date DESC";
-        return queryExpenses(sql, status);
+        return runExpenseQuery("WHERE e.status = ? ORDER BY e.date DESC", status);
     }
 
     public List<Expense> listByCategory(String category) {
-        String sql = baseExpenseSelect() + " WHERE lower(e.category) = lower(?) ORDER BY e.date DESC";
-        return queryExpenses(sql, category);
+        return runExpenseQuery("WHERE lower(e.category) = lower(?) ORDER BY e.date DESC", category);
     }
 
     public List<Expense> listByDateRange(String startDateInclusive, String endDateInclusive) {
-        String sql = baseExpenseSelect() + " WHERE e.date BETWEEN ? AND ? ORDER BY e.date ASC";
-        return queryExpenses(sql, startDateInclusive, endDateInclusive);
+        return runExpenseQuery("WHERE e.date BETWEEN ? AND ? ORDER BY e.date ASC", startDateInclusive, endDateInclusive);
     }
 
+    /**
+     * Changes the status of the expense and adds an approvals row in one transaction.
+     */
     public boolean updateStatus(String expenseId, String status, String reviewer, String comment) {
-        String sql = """
-            UPDATE expenses
-            SET status = ?, reviewer = ?, comment = ?, review_date = ?
-            WHERE id = ?
-        """;
+        String updateSql = """
+                UPDATE expenses
+                SET status = ?, reviewer = ?, comment = ?, review_date = ?
+                WHERE id = ?
+                """;
         String approvalSql = """
-            INSERT INTO approvals (id, expense_id, status, reviewer, comment, review_date)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """;
+                INSERT INTO approvals (id, expense_id, status, reviewer, comment, review_date)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """;
+
         try (Connection conn = database.getConnection();
-             PreparedStatement updateExpense = conn.prepareStatement(sql);
-             PreparedStatement insertApproval = conn.prepareStatement(approvalSql)) {
+             PreparedStatement updateStmt = conn.prepareStatement(updateSql);
+             PreparedStatement approvalStmt = conn.prepareStatement(approvalSql)) {
 
             conn.setAutoCommit(false);
 
             String reviewDate = LocalDate.now().toString();
-            updateExpense.setString(1, status);
-            updateExpense.setString(2, reviewer);
-            updateExpense.setString(3, comment);
-            updateExpense.setString(4, reviewDate);
-            updateExpense.setString(5, expenseId);
-            int rows = updateExpense.executeUpdate();
+            updateStmt.setString(1, status);
+            updateStmt.setString(2, reviewer);
+            updateStmt.setString(3, comment);
+            updateStmt.setString(4, reviewDate);
+            updateStmt.setString(5, expenseId);
 
-            if (rows == 0) {
+            int updatedRows = updateStmt.executeUpdate();
+            if (updatedRows == 0) {
                 conn.rollback();
                 conn.setAutoCommit(true);
                 return false;
             }
 
-            insertApproval.setString(1, UUID.randomUUID().toString());
-            insertApproval.setString(2, expenseId);
-            insertApproval.setString(3, status);
-            insertApproval.setString(4, reviewer);
-            insertApproval.setString(5, comment);
-            insertApproval.setString(6, reviewDate);
-            insertApproval.executeUpdate();
+            approvalStmt.setString(1, UUID.randomUUID().toString());
+            approvalStmt.setString(2, expenseId);
+            approvalStmt.setString(3, status);
+            approvalStmt.setString(4, reviewer);
+            approvalStmt.setString(5, comment);
+            approvalStmt.setString(6, reviewDate);
+            approvalStmt.executeUpdate();
 
             conn.commit();
             conn.setAutoCommit(true);
-            return rows > 0;
+            return true;
         } catch (SQLException e) {
             logger.log(Level.SEVERE, "Failed to update expense " + expenseId, e);
             return false;
         }
     }
 
-    private String baseExpenseSelect() {
-        return """
-            SELECT e.id, e.user_id, e.amount, e.description, e.date, e.status,
-                   e.reviewer, e.comment, e.review_date, e.category, u.username
-            FROM expenses e
-            LEFT JOIN users u ON e.user_id = u.id
-        """;
-    }
+    private List<Expense> runExpenseQuery(String clause, Object... args) {
+        String sql = """
+                SELECT e.id, e.user_id, e.amount, e.description, e.date, e.status,
+                       e.reviewer, e.comment, e.review_date, e.category, u.username
+                FROM expenses e
+                LEFT JOIN users u ON e.user_id = u.id
+                """ + clause;
 
-    private List<Expense> queryExpenses(String sql, Object... args) {
-        List<Expense> expenses = new ArrayList<>();
-        try (Connection conn = database.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+        List<Expense> result = new ArrayList<>();
+        try (Connection conn = database.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             for (int i = 0; i < args.length; i++) {
                 ps.setObject(i + 1, args[i]);
             }
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    expenses.add(mapExpense(rs));
+                    result.add(mapExpense(rs));
                 }
             }
         } catch (SQLException e) {
             logger.log(Level.SEVERE, "Error querying expenses", e);
         }
-        return expenses;
+        return result;
     }
 
     private Expense mapExpense(ResultSet rs) throws SQLException {

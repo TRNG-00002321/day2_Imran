@@ -82,4 +82,9 @@ public class Expense {
     public String getReviewDate() {
         return reviewDate;
     }
+
+    @Override
+    public String toString() {
+        return id + " | " + username + " | " + amount + " | " + status;
+    }
 }

@@ -13,6 +13,7 @@ import java.util.logging.Logger;
 
 public class UserDao {
     private static final Logger logger = Logger.getLogger(UserDao.class.getName());
+
     private final Database database;
 
     public UserDao(Database database) {
@@ -20,8 +21,9 @@ public class UserDao {
     }
 
     public Optional<User> findByUsername(String username) {
-        String sql = "SELECT id, username, password, role FROM users WHERE username = ?";
-        try (Connection conn = database.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+        String sql = "SELECT id, username, password, role FROM users WHERE lower(username) = lower(?)";
+        try (Connection conn = database.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, username);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {

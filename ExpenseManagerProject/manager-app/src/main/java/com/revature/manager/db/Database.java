@@ -27,18 +27,34 @@ public class Database {
         return DriverManager.getConnection(jdbcUrl);
     }
 
+    /**
+     * Ensures all required tables and columns exist before any DAO uses the database.
+     */
     public void initSchema() {
         try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
-            stmt.execute("""
+            createUsersTable(stmt);
+            createExpensesTable(stmt);
+            addCategoryColumn(stmt);
+            createApprovalsTable(stmt);
+            logger.log(Level.INFO, () -> "Database schema verified at " + dbPath.toAbsolutePath());
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Failed to initialize schema", e);
+        }
+    }
+
+    private void createUsersTable(Statement stmt) throws SQLException {
+        stmt.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     id TEXT PRIMARY KEY,
                     username TEXT UNIQUE NOT NULL,
                     password TEXT NOT NULL,
                     role TEXT NOT NULL
                 );
-            """);
+                """);
+    }
 
-            stmt.execute("""
+    private void createExpensesTable(Statement stmt) throws SQLException {
+        stmt.execute("""
                 CREATE TABLE IF NOT EXISTS expenses (
                     id TEXT PRIMARY KEY,
                     user_id TEXT NOT NULL,
@@ -52,16 +68,19 @@ public class Database {
                     review_date TEXT,
                     FOREIGN KEY (user_id) REFERENCES users(id)
                 );
-            """);
+                """);
+    }
 
-            
-            try {
-                stmt.execute("ALTER TABLE expenses ADD COLUMN category TEXT DEFAULT 'Uncategorized'");
-            } catch (SQLException e) {
-                logger.fine("Category column already exists on expenses table");
-            }
+    private void addCategoryColumn(Statement stmt) {
+        try {
+            stmt.execute("ALTER TABLE expenses ADD COLUMN category TEXT DEFAULT 'Uncategorized'");
+        } catch (SQLException e) {
+            logger.fine("Category column already exists on expenses table");
+        }
+    }
 
-            stmt.execute("""
+    private void createApprovalsTable(Statement stmt) throws SQLException {
+        stmt.execute("""
                 CREATE TABLE IF NOT EXISTS approvals (
                     id TEXT PRIMARY KEY,
                     expense_id TEXT NOT NULL,
@@ -71,12 +90,6 @@ public class Database {
                     review_date TEXT NOT NULL,
                     FOREIGN KEY (expense_id) REFERENCES expenses(id)
                 );
-            """);
-
-            logger.info("Database schema verified at " + dbPath.toAbsolutePath());
-        } catch (SQLException e) {
-            logger.log(Level.SEVERE, "Failed to initialize schema", e);
-        }
+                """);
     }
-
 }

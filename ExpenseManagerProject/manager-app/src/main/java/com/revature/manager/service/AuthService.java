@@ -21,29 +21,29 @@ public class AuthService {
         System.out.print("Username: ");
         String username = scanner.nextLine().trim();
 
-        Optional<User> user = userDao.findByUsername(username);
-        if (user.isEmpty()) {
+        Optional<User> userOpt = userDao.findByUsername(username);
+        if (userOpt.isEmpty()) {
             System.out.println("Login failed: user not found.");
             logger.warning("Login failed for username " + username + ": not found");
             return Optional.empty();
         }
 
-        User found = user.get();
-        if (!"Manager".equalsIgnoreCase(found.getRole())) {
-            System.out.println("Login failed: account found but role is not Manager.");
-            logger.warning("Login failed for username " + username + ": role " + found.getRole());
+        User user = userOpt.get();
+        if (!"Manager".equalsIgnoreCase(user.getRole())) {
+            System.out.println("Login failed: account exists but role is not Manager.");
+            logger.warning("Login failed for username " + username + ": invalid role " + user.getRole());
             return Optional.empty();
         }
 
         System.out.print("Password: ");
         String password = scanner.nextLine();
-        if (!found.getPassword().equals(password)) {
+        if (!user.getPassword().equals(password)) {
             System.out.println("Login failed: incorrect password.");
-            logger.warning("Login failed for username " + username + ": bad password");
+            logger.warning("Login failed for username " + username + ": wrong password");
             return Optional.empty();
         }
 
         logger.info("Login successful for " + username);
-        return Optional.of(found);
+        return Optional.of(user);
     }
 }

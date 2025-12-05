@@ -25,19 +25,19 @@ public class ExpenseService {
     }
 
     public boolean approveExpense(String expenseId, User reviewer, String comment) {
-        boolean updated = expenseDao.updateStatus(expenseId, "approved", reviewer.getId(), comment);
-        if (updated) {
+        boolean result = expenseDao.updateStatus(expenseId, "approved", reviewer.getId(), comment);
+        if (result) {
             logger.info("Approved expense " + expenseId + " by " + reviewer.getUsername());
         }
-        return updated;
+        return result;
     }
 
     public boolean denyExpense(String expenseId, User reviewer, String comment) {
-        boolean updated = expenseDao.updateStatus(expenseId, "denied", reviewer.getId(), comment);
-        if (updated) {
+        boolean result = expenseDao.updateStatus(expenseId, "denied", reviewer.getId(), comment);
+        if (result) {
             logger.info("Denied expense " + expenseId + " by " + reviewer.getUsername());
         }
-        return updated;
+        return result;
     }
 
     public List<Expense> listExpensesByUser(String userId) {
